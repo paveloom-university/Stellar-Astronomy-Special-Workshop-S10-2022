@@ -21,7 +21,13 @@ using Zygote # Derivatives
 pgfplotsx()
 
 # Change some of the default parameters for plots
-default(fontfamily="Computer Modern", dpi=300, legend=:topright, size=(400, 400))
+default(
+  fontfamily="Computer Modern",
+  dpi=300,
+  legend=:topright,
+  legendfontsize=8,
+  size=(300, 300),
+)
 
 # Define the paths to output directories
 CURRENT_DIR = @__DIR__
@@ -29,10 +35,12 @@ ROOT_DIR = basename(CURRENT_DIR) == "scripts" ? dirname(CURRENT_DIR) : CURRENT_D
 DATA_DIR = joinpath(ROOT_DIR, "data")
 PLOTS_DIR = joinpath(ROOT_DIR, "plots")
 TRACES_DIR = joinpath(ROOT_DIR, "traces")
+TABLES_DIR = joinpath(ROOT_DIR, "report", "tables")
 
 # Make sure the needed directories exist
 mkpath(PLOTS_DIR)
 mkpath(TRACES_DIR)
+mkpath(TABLES_DIR)
 
 "First model function (normal distribution)"
 normal(f, μ, σ) = 1 / (σ * √(2 * π)) * exp(-(f - μ)^2 / (2 * σ^2))
@@ -98,15 +106,26 @@ function test(int_f::Function, θ::Vector{F}, bins::Vector{F}, n_j::Vector{I}, n
     return χ², α
 end
 
+# Get the paths to data files
+DATA_FILES = filter(endswith(".dat"), readdir(DATA_DIR, join=true))
+DATA_FILES_N = length(DATA_FILES)
+
+# Prepare storage for all results
+names = Vector{String}()
+θ = Matrix{F}(undef, 7, DATA_FILES_N)
+vars_0_1 = Matrix{Union{F, I}}(undef, 7, DATA_FILES_N)
+vars_0_2 = similar(vars_0_1)
+
 # For each data file
-for data in filter(endswith(".dat"), readdir(DATA_DIR, join=true))
+for (i, data_file) in enumerate(DATA_FILES)
     # Get the name of the data file
-    name = chop(basename(data), tail=4)
+    name = chop(basename(data_file), tail=4)
+    push!(names, name)
 
     println(" "^4, "> Loading data from \"$(name).dat\"...")
 
     # Read the data
-    f = vec(readdlm(data))
+    f = vec(readdlm(data_file))
     n = length(f)
 
     # Define and create directories for the current data file
@@ -169,6 +188,9 @@ for data in filter(endswith(".dat"), readdir(DATA_DIR, join=true))
         " "^8, "c = $(c)\n",
     )
 
+    # Save the parameters
+    θ[:, i] = [θ_normal; θ_bimodal]
+
     # For each histogram step
     for Δf in [0.1, 0.2]
         println(" "^6, "> Performing computations with Δf = $(Δf)...")
@@ -190,7 +212,7 @@ for data in filter(endswith(".dat"), readdir(DATA_DIR, join=true))
         # Plot a histogram of the data
         p = histogram(
             f;
-            label="$(name).dat",
+            label="",
             xlabel=L"[\mathrm{Fe}/\mathrm{H}]",
             ylabel=L"N",
             bins,
@@ -226,5 +248,91 @@ for data in filter(endswith(".dat"), readdir(DATA_DIR, join=true))
             " "^10, "χ² = $(χ²_bimodal)\n",
             " "^10, "α = $(α_bimodal)\n",
         )
+
+        # Save the results
+        vars = Union{I, F}[n, j, j - 1, χ²_normal, α_normal, χ²_bimodal, α_bimodal]
+        if Δf == 0.1
+            vars_0_1[:, i] = vars
+        else
+            vars_0_2[:, i] = vars
+        end
     end
 end
+
+println(" "^4, "> Generating the tables...")
+
+# Generate the parameters table
+open(joinpath(TABLES_DIR, "params.tex"), "w") do io
+    digits = 5
+    println(io, """
+    \\begin{table}[H]
+      \\centering
+      \\caption{Точечные оценки параметров моделей}
+      \\begin{tabular}{ccccc}
+        \\toprule
+        Параметр &
+        $(join([
+            "\\texttt{$(replace(name, '_' => "\\_")).dat}" * (i == length(names) ? " \\\\" : " & ")
+            for (i, name) in enumerate(names)
+        ]))
+        \\midrule
+        \$ \\mu \$$(join([ " & $(round(param; digits))" for param in θ[1, :] ])) \\\\
+        \\arrayrulecolor{black!40}
+        \\midrule
+        \$ \\sigma \$$(join([ " & $(round(param; digits))" for param in θ[2, :] ])) \\\\
+        \\midrule
+        \$ \\mu_1 \$$(join([ " & $(round(param; digits))" for param in θ[3, :] ])) \\\\
+        \\midrule
+        \$ \\sigma_1 \$$(join([ " & $(round(param; digits))" for param in θ[4, :] ])) \\\\
+        \\midrule
+        \$ \\mu_2 \$$(join([ " & $(round(param; digits))" for param in θ[5, :] ])) \\\\
+        \\midrule
+        \$ \\sigma_2 \$$(join([ " & $(round(param; digits))" for param in θ[6, :] ])) \\\\
+        \\midrule
+        \$ c \$$(join([ " & $(round(param; digits))" for param in θ[7, :] ])) \\\\
+        \\arrayrulecolor{black}
+        \\bottomrule
+      \\end{tabular}
+    \\end{table}
+    """)
+end
+
+# Generate the test variables tables
+for (Δf, m) in ((0.1, vars_0_1), (0.2, vars_0_2))
+    open(joinpath(TABLES_DIR, "test, $Δf.tex"), "w") do io
+        digits = 5
+        println(io, """
+        \\begin{table}[H]
+          \\centering
+          \\caption{Результаты применения критерия согласия Пирсона при \$ \\Delta \\hat{f} = $Δf \$}
+          \\begin{tabular}{ccccc}
+            \\toprule
+            Переменная &
+            $(join([
+                "\\texttt{$(replace(name, '_' => "\\_")).dat}" * (i == length(names) ? " \\\\" : " & ")
+                for (i, name) in enumerate(names)
+            ]))
+            \\midrule
+            \$ N \$$(join([ " & $param" for param in m[1, :] ])) \\\\
+            \\arrayrulecolor{black!40}
+            \\midrule
+            \$ J \$$(join([ " & $param" for param in m[2, :] ])) \\\\
+            \\midrule
+            \$ k \$$(join([ " & $param" for param in m[3, :] ])) \\\\
+            \\midrule
+            \$ \\chi_{q, \\, \\text{normal}}^2 \$$(join([ " & $(round(param; digits))" for param in m[4, :] ])) \\\\
+            \\midrule
+            \$ \\alpha_{q, \\, \\text{normal}} \$$(join([ " & $(round(param; digits))" for param in m[5, :] ])) \\\\
+            \\midrule
+            \$ \\chi_{q, \\, \\text{bimodal}}^2 \$$(join([ " & $(round(param; digits))" for param in m[6, :] ])) \\\\
+            \\midrule
+            \$ \\alpha_{q, \\, \\text{bimodal}} \$$(join([ " & $(round(param; digits))" for param in m[7, :] ])) \\\\
+            \\arrayrulecolor{black}
+            \\bottomrule
+          \\end{tabular}
+        \\end{table}
+        """)
+    end
+end
+
+println()

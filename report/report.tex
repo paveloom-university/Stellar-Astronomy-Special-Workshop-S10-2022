@@ -1,0 +1,171 @@
+\documentclass[a4paper, oneside]{article}
+\special{pdf:minorversion 6}
+
+\usepackage{geometry}
+\geometry{
+  textwidth=358.0pt,
+  textheight=608.0pt,
+  top=90pt,
+  left=113pt,
+}
+
+\usepackage[english, russian]{babel}
+
+\usepackage{fontspec}
+\setmainfont[
+  Ligatures=TeX,
+  Extension=.otf,
+  BoldFont=cmunbx,
+  ItalicFont=cmunti,
+  BoldItalicFont=cmunbi,
+]{cmunrm}
+\usepackage{unicode-math}
+
+\usepackage[bookmarks=false]{hyperref}
+\hypersetup{pdfstartview={FitH},
+            colorlinks=true,
+            linkcolor=magenta,
+            pdfauthor={Павел Соболев}}
+
+\usepackage[table]{xcolor}
+\usepackage{booktabs}
+\usepackage{caption}
+
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{graphicx}
+\graphicspath{ {../plots/} }
+\DeclareGraphicsExtensions{.pdf}
+
+\usepackage{sectsty}
+\sectionfont{\centering}
+\subsubsectionfont{\centering\normalfont\itshape}
+
+\newcommand{\su}{\vspace{-0.5em}}
+
+\setlength{\parindent}{0pt}
+
+\newlength{\imagewidth}
+\newlength{\imageheight}
+\newcommand{\subgraphics}[1]{
+\settowidth{\imagewidth}{\includegraphics[height=\imageheight]{#1}}%
+\begin{subfigure}{\imagewidth}%
+    \includegraphics[height=\imageheight]{#1}%
+\end{subfigure}%
+}
+
+\hypersetup{pdftitle={Специальный практикум (10-ый семестр, 2022)}}
+
+\begin{document}
+
+\subsubsection*{Специальный практикум (10-ый семестр, 2022)}
+\section*{Применение критерия согласия Пирсона}
+\subsubsection*{Руководитель: И. И. Никифоров \hspace{2em} Выполнил: П. Л. Соболев}
+
+\vspace{3em}
+
+\subsection*{Задачи}
+
+\begin{itemize}
+  \setlength\itemsep{-0.1em}
+  \item Оптимизировать параметры моделей нормального и бимодального распределений металличностей по представленным данным, используя метод наибольшего правдоподобия;
+  \item Применить критерий согласия Пирсона к каждой комбинации моделей и данных.
+\end{itemize}
+
+\subsection*{Ход выполнения и результаты}
+
+Модельные функции:
+
+\su
+\begin{equation}
+  \varphi_\text{normal}(f; \mu, \sigma) = \frac{1}{\sqrt{2 \pi} \sigma} e^{\displaystyle -\frac{(f - \mu)^2}{2 \sigma^2}},
+\end{equation}
+
+\su
+\begin{equation}
+  \varphi_\text{bimodal}(f; \mu_1, \sigma_1, \mu_2, \sigma_2, c) = \frac{c}{\sqrt{2 \pi} \sigma_1} e^{\displaystyle -\frac{(f - \mu_1)^2}{2 \sigma_1^2}} + \frac{1 - c}{\sqrt{2 \pi} \sigma_2} e^{\displaystyle -\frac{(f - \mu_2)^2}{2 \sigma_2^2}}.
+\end{equation}
+
+
+Для этих двух модельных распределений находим статистику
+
+\su
+\begin{equation}
+  \chi_q^2 = \sum_{j=1}^{J} \frac{(N_j - N p_j)^2}{N p_j}
+\end{equation}
+
+и уровень значимости
+
+\su
+\begin{equation}
+  \alpha_q = P(X \geqslant \chi_q^2) \;\; \text{при} \;\; X \sim \chi^2(k), \;\; k = J - 1.
+\end{equation}
+
+Здесь $ N $ --- объём выборки, $ J $ --- число ячеек (разрядов), $ N_j $ --- число объектов, попавших в ячейку с индексом $ j $, а $ p_j $ --- вероятность попадания случайной величины $ f $ в эту ячейку:
+
+\su
+\begin{equation}
+  p_j = \int_{\hat{f}_j}^{\hat{f}_{j+1}} \varphi_\text{mod}(f) \, df.
+\end{equation}
+
+Для нормального распределения имеем
+
+\su
+\begin{equation}
+  p_j = \int_{\hat{f}_j}^{\hat{f}_{j+1}} \varphi_\text{normal}(f; \mu, \sigma) \, df = \frac{1}{2} \mathrm{erf}{\left( \frac{f - \mu}{\sqrt{2} \sigma} \right)} \bigg|_{\hat{f}_j}^{\hat{f}_{j+1}},
+\end{equation}
+
+где $ \mathrm{erf}(z) $ --- функция ошибок:
+
+\su
+\begin{equation}
+  \mathrm{erf}(z) = \frac{2}{\sqrt{\pi}} \int_0^z e^{-t^2} \, dt.
+\end{equation}
+
+Результаты получены с помощью скрипта, написанного на языке программирования \href{https://julialang.org}{Julia}. Код расположен в GitLab репозитории \href{https://gitlab.com/paveloom-g/university/s10-2022/stellar-astronomy-special-workshop}{Stellar Astronomy Special Workshop S10-2022}. Для воспроизведения результатов следуй инструкциям в файле {\footnotesize \texttt{README.md}}.
+
+\newpage
+
+\input{tables/params.tex}
+\input{tables/test, 0.1.tex}
+\input{tables/test, 0.2.tex}
+
+\newpage
+
+\captionsetup{justification=centering}
+
+\begin{figure}[H]
+  \centering
+  \setlength{\imageheight}{6.2cm}
+  \subgraphics{all/histogram, 0.1}
+  \subgraphics{all/histogram, 0.2}
+  \caption{Гистограммы данных из файла \texttt{all.dat} \\ и оптимизированные модельные функции}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \setlength{\imageheight}{6.2cm}
+  \subgraphics{wo_p1/histogram, 0.1}
+  \subgraphics{wo_p1/histogram, 0.2}
+  \caption{Гистограммы данных из файла \texttt{wo\_p1.dat} \\ и оптимизированные модельные функции}
+\end{figure}
+
+\newpage
+
+\begin{figure}[H]
+  \centering
+  \setlength{\imageheight}{6.2cm}
+  \subgraphics{wo_p12/histogram, 0.1}
+  \subgraphics{wo_p12/histogram, 0.2}
+  \caption{Гистограммы данных из файла \texttt{wo\_p12.dat} \\ и оптимизированные модельные функции}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \setlength{\imageheight}{6.2cm}
+  \subgraphics{wo_p123/histogram, 0.1}
+  \subgraphics{wo_p123/histogram, 0.2}
+  \caption{Гистограммы данных из файла \texttt{wo\_p123.dat} \\ и оптимизированные модельные функции}
+\end{figure}
+
+\end{document}

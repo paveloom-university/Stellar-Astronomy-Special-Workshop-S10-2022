@@ -1,8 +1,12 @@
-# Plots
+# Results
 plots
-
-# Traces
 traces
+report/tables
+
+# TeX auxiliary files
+report/**/*.log
+report/**/*.gz
+report/**/*.aux
 
 # Signers
 .gitsigners
